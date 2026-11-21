@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { journeys, stations } from "./data.js";
 
@@ -340,6 +341,7 @@ function App() {
             <h1 className="page-title centered-title">You're all set.</h1>
             <p className="muted centered-text">Your demo journey is saved on this device and available offline.</p>
             <Ticket booking={activeBooking} />
+            <BookingQR booking={activeBooking} />
             <div className="notice-box warning-box"><strong>Not a valid travel ticket</strong><p>This is a hackathon demonstration. No railway reservation has been made. Stripe payments, when used, are in test mode only.</p></div>
             <button className="primary-button full-button" onClick={() => openBooking(activeBooking)}>View my journey</button>
             <button className="text-button full-button" onClick={() => nav("search")}>Search another journey</button>
@@ -374,12 +376,14 @@ function App() {
             <div className="eyebrow">Journey details</div>
             <h1 className="page-title">Your itinerary</h1>
             <Ticket booking={activeBooking} />
+            <BookingQR booking={activeBooking} />
             <div className="timeline-card">
               <h2>Journey timeline</h2>
               <div className="timeline">
                 {activeBooking.journey.stops.map((stop, index) => <div className="timeline-stop" key={`${stop}-${index}`}><span className="timeline-dot" /><div><strong>{stop}</strong><small>{index === 0 ? activeBooking.journey.depart : index === activeBooking.journey.stops.length - 1 ? activeBooking.journey.arrive : "Scheduled stop"}</small></div></div>)}
               </div>
             </div>
+            <OnDemandMap key={activeBooking.id} journey={activeBooking.journey} />
             <div className="notice-box"><strong>Offline access</strong><p>This itinerary is saved on this device. Live disruption information is unavailable in this demo.</p></div>
             {activeBooking.status === "confirmed" && <button className="danger-button full-button" onClick={() => cancelBooking(activeBooking.id)}>Remove demo booking</button>}
             <p className="disclaimer">Removing this demo booking does not cancel a real railway ticket.</p>
@@ -398,6 +402,44 @@ function App() {
       </nav>
     </div>
   );
+}
+
+function BookingQR({ booking }) {
+  const [dataUrl, setDataUrl] = useState("");
+  useEffect(() => {
+    let active = true;
+    // Encode only an opaque demo reference, never passenger details or Stripe identifiers.
+    QRCode.toDataURL(`ROUTA-DEMO:${booking.id}`, { width: 280, margin: 4, errorCorrectionLevel: "H", color: { dark: "#172c26", light: "#ffffff" } })
+      .then(url => { if (active) setDataUrl(url); })
+      .catch(() => { if (active) setDataUrl(""); });
+    return () => { active = false; };
+  }, [booking.id]);
+  return <section className="qr-panel" aria-label="Demo booking QR code">
+    <div><h2>Booking QR</h2><p>Scannable demo reference · Not a valid railway ticket</p></div>
+    {dataUrl ? <img src={dataUrl} alt={`QR code containing demo booking reference ${booking.id}`} width="200" height="200" /> : <p>Generating QR code…</p>}
+    <strong>{booking.id}</strong>
+  </section>;
+}
+
+const CITY_COORDS = {
+  Brussels:[50.8503,4.3517], Antwerp:[51.2194,4.4025], Amsterdam:[52.3676,4.9041],
+  Rotterdam:[51.9244,4.4777], Paris:[48.8566,2.3522], Lille:[50.6292,3.0573],
+  Berlin:[52.52,13.405], Prague:[50.0755,14.4378], Cologne:[50.9375,6.9603],
+  Hamburg:[53.5511,9.9937], Milan:[45.4642,9.19], Zurich:[47.3769,8.5417]
+};
+function OnDemandMap({ journey }) {
+  const [show, setShow] = useState(false);
+  const stops = [journey.from, ...(journey.stops || []), journey.to];
+  const coords = stops.map(name => CITY_COORDS[Object.keys(CITY_COORDS).find(city => name.toLowerCase().includes(city.toLowerCase()))]).filter(Boolean);
+  const lats = coords.map(p => p[0]); const lons = coords.map(p => p[1]);
+  const bbox = coords.length ? [Math.min(...lons)-0.65,Math.min(...lats)-0.4,Math.max(...lons)+0.65,Math.max(...lats)+0.4].join(",") : null;
+  return <section className="map-panel">
+    <div className="map-heading"><div><h2>Explore the route</h2><p>Optional map · Loaded only when requested</p></div>
+      <button className="secondary-button" type="button" aria-expanded={show} onClick={() => setShow(v => !v)}>{show ? "Hide interactive map" : "Show interactive map ↗"}</button>
+    </div>
+    {show && (bbox ? <><iframe title={`OpenStreetMap overview of ${journey.from} to ${journey.to}`} loading="lazy" referrerPolicy="no-referrer" src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik`} />
+      <p className="map-caption">Geographic overview only, not a verified rail track or live route. Map data © OpenStreetMap contributors. Requires internet access.</p></> : <p className="map-caption">A map preview is not available for this demonstration itinerary.</p>)}
+  </section>;
 }
 
 function Ticket({ booking }) {

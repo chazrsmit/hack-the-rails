@@ -106,3 +106,12 @@ This prototype has no backend, authentication, payment processing or server-side
 ## Brand
 
 "Routa" is a temporary working name. Check trademark, company-name and domain availability before public/commercial use.
+
+
+## Updated features / deployment
+
+- **QR code:** generated on-device with the `qrcode` package. It encodes only `ROUTA-DEMO:<reference>` and is **not** an actual rail ticket. The package is bundled into the frontend; no third-party QR service is called.
+- **Map:** an OpenStreetMap iframe is created **only after** clicking *Show interactive map*. This is a geographic overview, not a rail track or timetable. It needs a connection and transfers data to OpenStreetMap when enabled.
+- **Accessibility:** sticky navigation, larger type, keyboard focus indicators, 44px+ controls.
+- **Render deployment:** Build command `npm install && npm run build`, start command `npm run server`; the Express server now serves `dist` in production. Set `STRIPE_SECRET_KEY=sk_test_...`, `CLIENT_ORIGIN=https://YOUR-RENDER-URL.onrender.com`, and `NODE_ENV=production`. Do not set `PORT` on Render.
+- **Important:** all fares, journeys and QR references are demonstration data; a Stripe test payment does not issue a valid railway ticket.
