@@ -626,3 +626,31 @@ body { background:#f8f8f4; color:var(--ink); font-size:16px; line-height:1.55; }
     grid-row: 4;
   }
 }
+/* LOGIN BUTTON */
+
+.login-button {
+  background: #b9d4bb;
+  color: #233b2d;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  min-height: 42px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.login-button:hover {
+  background: #a5c6ab;
+}
+
+/* Mobile */
+
+@media (max-width: 760px) {
+  .login-button {
+    padding: 9px 16px;
+    min-height: 38px;
+    font-size: 13px;
+  }
+}

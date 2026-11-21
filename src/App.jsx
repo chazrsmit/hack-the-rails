@@ -227,7 +227,10 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className={`connection ${online ? "" : "offline"}`}><span className="connection-dot" />{online ? "Online" : "Offline mode"}</div>
+        {/* <div className={`connection ${online ? "" : "offline"}`}><span className="connection-dot" />{online ? "Online" : "Offline mode"}</div> */}
+        <button type="button" className="login-button">
+  Log out
+</button>
       </header>
 
       {!online && <div className="offline-banner">You're offline. Saved journeys are available; live information and new bookings are paused.</div>}
