@@ -43,7 +43,7 @@ function App() {
   const [passengers, setPassengers] = useState("1");
   const [searched, setSearched] = useState(false);
   const [sort, setSort] = useState("recommended");
-  const [visibleCount, setVisibleCount] = useState(5);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [selected, setSelected] = useState(null);
   const [passengerName, setPassengerName] = useState("");
   const [bookings, setBookings] = useState(readBookings);
@@ -149,7 +149,7 @@ function App() {
     }
     setNotice("");
     setSearched(true);
-    setVisibleCount(5);
+    setVisibleCount(10);
     setPage("results");
     setSelected(null);
   }
@@ -271,8 +271,8 @@ function App() {
         {page === "results" && (
           <section className="content-section results-page">
             <button className="back-link" onClick={() => nav("search")}>← Modify search</button>
-            <div className="section-heading"><div><div className="eyebrow">02 / DISCOVER</div><h1 className="page-title">Your <em>options.</em></h1><p className="route-subtitle">{from} <span>↗</span> {to}</p><p className="muted">{new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {passengers} {Number(passengers) === 1 ? "passenger" : "passengers"}</p></div><span className="result-count">{results.length} JOURNEYS</span></div>
-            <div className="results-toolbar"><span className="toolbar-title">Choose what matters most</span><div className="sort-control">{[["recommended","Balanced"],["cheapest","Lowest price"],["fastest","Shortest time"]].map(([value,label]) => <button key={value} className={sort === value ? "sort-option selected" : "sort-option"} onClick={() => { setSort(value); setVisibleCount(5); }}>{label}</button>)}</div></div>
+            <div className="section-heading"><div><div className="eyebrow"></div><h1 className="page-title">Your <em>options.</em></h1><p className="route-subtitle">{from} <span>↗</span> {to}</p><p className="muted">{new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {passengers} {Number(passengers) === 1 ? "passenger" : "passengers"}</p></div><span className="result-count">{results.length} JOURNEYS</span></div>
+            <div className="results-toolbar"><span className="toolbar-title">Choose what matters most</span><div className="sort-control">{[["recommended","Balanced"],["cheapest","Lowest price"],["fastest","Shortest time"]].map(([value,label]) => <button key={value} className={sort === value ? "sort-option selected" : "sort-option"} onClick={() => { setSort(value); setVisibleCount(10); }}>{label}</button>)}</div></div>
             {results.length === 0 ? <div className="empty-state"><h2>No journeys found for this route</h2><p>Try Brussels–Amsterdam, Brussels–Paris, Brussels–Antwerp or the reverse routes. Try another departure or destination.</p><button className="secondary-button" onClick={() => nav("search")}>Change route</button></div> : <div className="journey-list">
               {results.slice(0,visibleCount).map((journey,index) => <article className="journey-card" key={journey.id}>
                 <div className="journey-main"><div className="journey-card-top"><span className="journey-number">OPTION {String(index+1).padStart(2,"0")}</span><span className="journey-operator">{journey.operator} · {journey.code}</span></div>
@@ -281,7 +281,7 @@ function App() {
                 </div>
                 <div className="journey-action">{journey.id === recommendedId && <span className="recommendation">✳ GOOD BALANCE</span>}<span className="price-label">FROM / PERSON</span><div className="price">{money(journey.price)}</div><button className="primary-button choose-button" onClick={() => startBooking(journey)} disabled={!online}>Book journey <span aria-hidden="true">↗</span></button></div>
               </article>)}
-              {visibleCount < results.length && <button className="load-more" onClick={() => setVisibleCount(n=>n+5)}>Show more journeys ↓</button>}
+              {visibleCount < results.length && <button className="load-more" onClick={() => setVisibleCount(n => n + 10)}>Show 10 more journeys ↓</button>}
             </div>}
           </section>
         )}
