@@ -46,6 +46,7 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(10);
   const [selected, setSelected] = useState(null);
   const [passengerName, setPassengerName] = useState("");
+  const [passengerEmail, setPassengerEmail] = useState("");
   const [bookings, setBookings] = useState(readBookings);
   const [activeBooking, setActiveBooking] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
@@ -88,6 +89,7 @@ function App() {
           date: result.date,
           passengers: result.passengers,
           passengerName: sessionStorage.getItem("routa-pending-name") || "Guest passenger",
+          passengerEmail: result.email || sessionStorage.getItem("routa-pending-email") || "",
           createdAt: new Date().toISOString(),
           status: "confirmed",
           paymentStatus: "paid_test"
@@ -96,6 +98,7 @@ function App() {
         setActiveBooking(booking);
         setPage("confirmation");
         sessionStorage.removeItem("routa-pending-name");
+        sessionStorage.removeItem("routa-pending-email");
       } catch (error) {
         if (!cancelled) setNotice(error.message);
       } finally {
@@ -157,30 +160,38 @@ function App() {
   function startBooking(journey) {
     setSelected(journey);
     setPassengerName("");
+    setPassengerEmail("");
     setPage("checkout");
   }
 
   async function payWithStripe() {
     if (!selected || !online) return;
+    if (!passengerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passengerEmail.trim())) {
+      setNotice("Enter a passenger name and a valid email address.");
+      return;
+    }
+    setNotice("");
     setStripeLoading(true);
     try {
-      const response = await fetch("/api/checkout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({journeyId:selected.id,passengers:Number(passengers),date})});
+      const response = await fetch("/api/checkout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({journeyId:selected.id,passengers:Number(passengers),date,email:passengerEmail.trim()})});
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error(data.error || "Checkout unavailable");
-      sessionStorage.setItem("routa-pending-name", passengerName.trim() || "Guest passenger");
+      sessionStorage.setItem("routa-pending-name", passengerName.trim());
+      sessionStorage.setItem("routa-pending-email", passengerEmail.trim());
       window.location.assign(data.url);
     } catch (error) {setNotice(error.message);} finally {setStripeLoading(false);}
   }
 
   function confirmBooking(event) {
     event.preventDefault();
-    if (!selected || !passengerName.trim()) return;
+    if (!selected || !passengerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passengerEmail.trim())) return;
     const booking = {
       id: `RT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       journey: selected,
       date,
       passengers: Number(passengers),
       passengerName: passengerName.trim(),
+      passengerEmail: passengerEmail.trim(),
       createdAt: new Date().toISOString(),
       status: "confirmed"
     };
@@ -289,7 +300,7 @@ function App() {
         {page === "checkout" && selected && (
           <section className="content-section narrow-section">
             <button className="back-link" onClick={() => nav("results")}>← Back to results</button>
-            <div className="eyebrow">03 / CHECKOUT</div>
+            <div className="eyebrow"></div>
             <h1 className="page-title">One last <em>step.</em></h1>
             <p className="muted">Review your selected journey and add a passenger name.</p>
             <div className="summary-card">
@@ -299,7 +310,8 @@ function App() {
             </div>
             <form className="checkout-form" onSubmit={confirmBooking}>
               <label className="field"><span>Passenger name</span><input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} maxLength="70" autoComplete="off" placeholder="e.g. Alex Morgan" required /></label>
-              <div className="notice-box"><strong>Checkout information</strong><p>Save an itinerary locally or use Stripe test checkout. No railway reservation is made. Stripe uses test payments only. Please use a fictional passenger name.</p></div>
+              <label className="field"><span>Email address</span><input type="email" value={passengerEmail} onChange={(e) => setPassengerEmail(e.target.value)} maxLength={254} autoComplete="email" placeholder="e.g. alex@example.com" required /></label>
+              {/* <div className="notice-box"><strong>Checkout information</strong><p>Save an itinerary locally or use Stripe test checkout. No railway reservation is made. Stripe uses test payments only. Please use a fictional passenger name.</p></div> */}
               {/* <button className="primary-button full-button" type="submit" disabled={!online}>Save itinerary without payment <span>→</span></button> */}
               <button className="secondary-button full-button" type="button" disabled={!online || stripeLoading} onClick={payWithStripe}>{stripeLoading ? "Opening Stripe…" : "Pay with Stripe →"}</button>
               {notice && <p className="form-error" role="alert">{notice}</p>}
