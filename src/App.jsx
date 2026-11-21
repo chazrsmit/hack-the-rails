@@ -268,11 +268,11 @@ function App() {
                 {notice && <p className="form-error" role="alert">{notice}</p>}
               </form>
               <aside className="home-feature" aria-label="Routa approach">
-                <span className="feature-index">A BETTER WAY THROUGH EUROPE</span>
+                <span className="feature-index">A LIGHTER WAY THROUGH EUROPE</span>
                 
                 <h2>More journey.<br/><em>Less noise.</em></h2>
                 <p>Simple choices. Lighter pages. Your route, at your pace.</p>
-                <div className="feature-footer"><span>NO ADS</span><span>OFFLINE ITINERARIES</span><span>MAPS ON REQUEST</span></div>
+                <div className="feature-footer"><span>NO ADS</span><span>OFFLINE ITINERARIES</span></div>
               </aside>
             </div>
             <div className="trust-row"><span>01 — Compare clearly</span><span>02 — Secure checkout</span><span>03 — Keep your itinerary offline</span></div>
