@@ -2,10 +2,12 @@ import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { journeys, stations } from "./data.js";
 
-const STORAGE_KEY = "routa-demo-bookings";
+const STORAGE_KEY = "routa-bookings";
 const readBookings = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
-  catch { return []; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return Array.isArray(saved) ? saved.filter((booking) => booking.status !== "cancelled") : [];
+  } catch { return []; }
 };
 const money = (value) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR" }).format(value);
 const durationLabel = (minutes) => `${Math.floor(minutes / 60)}h ${minutes % 60 ? `${minutes % 60}m` : ""}`.trim();
@@ -49,6 +51,16 @@ function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [notice, setNotice] = useState("");
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 48);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -75,7 +87,7 @@ function App() {
           journey,
           date: result.date,
           passengers: result.passengers,
-          passengerName: sessionStorage.getItem("routa-pending-name") || "Demo passenger",
+          passengerName: sessionStorage.getItem("routa-pending-name") || "Guest passenger",
           createdAt: new Date().toISOString(),
           status: "confirmed",
           paymentStatus: "paid_test"
@@ -155,7 +167,7 @@ function App() {
       const response = await fetch("/api/checkout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({journeyId:selected.id,passengers:Number(passengers),date})});
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error(data.error || "Checkout unavailable");
-      sessionStorage.setItem("routa-pending-name", passengerName.trim() || "Demo passenger");
+      sessionStorage.setItem("routa-pending-name", passengerName.trim() || "Guest passenger");
       window.location.assign(data.url);
     } catch (error) {setNotice(error.message);} finally {setStripeLoading(false);}
   }
@@ -179,10 +191,8 @@ function App() {
   }
 
   function cancelBooking(id) {
-    const updated = bookings.map((booking) =>
-      booking.id === id ? { ...booking, status: "cancelled" } : booking
-    );
-    setBookings(updated);
+    if (!window.confirm("Cancel this saved journey? It will disappear from My journeys. This does not cancel a train reservation or refund a Stripe payment.")) return;
+    setBookings((current) => current.filter((booking) => booking.id !== id));
     setActiveBooking(null);
     setPage("tickets");
   }
@@ -204,7 +214,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="topbar">
+      <header className={`topbar ${scrolled ? "topbar--compact" : ""}`}>
         <button className="brand" onClick={() => nav("search")} aria-label="Routa home">
           <TrainMark />
           <span>routa<span className="brand-period">.</span></span>
@@ -224,112 +234,73 @@ function App() {
 
       <main className="main-content">
         {page === "search" && (
-          <section className="hero">
-            <div className="eyebrow"><span className="eyebrow-line" /> A simpler way to travel</div>
-            <h1>Good journeys<br /><span>start here.</span></h1>
-            <p className="hero-copy">Find the train that works for you. Compare routes, keep your tickets close, and travel with less friction.</p>
-            <form className="search-panel" onSubmit={runSearch}>
-              <div className="field-grid">
-                <label className="field">
-                  <span>From</span>
-                  <select value={from} onChange={(e) => setFrom(e.target.value)}>
-                    {stations.map((station) => <option key={station}>{station}</option>)}
-                  </select>
-                </label>
-                <button type="button" className="swap-button" aria-label="Swap departure and arrival" onClick={() => { setFrom(to); setTo(from); }}>⇄</button>
-                <label className="field">
-                  <span>To</span>
-                  <select value={to} onChange={(e) => setTo(e.target.value)}>
-                    {stations.map((station) => <option key={station}>{station}</option>)}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Departure</span>
-                  <input type="date" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} required />
-                </label>
-                <label className="field">
-                  <span>Passengers</span>
-                  <select value={passengers} onChange={(e) => setPassengers(e.target.value)}>
-                    {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} {n === 1 ? "passenger" : "passengers"}</option>)}
-                  </select>
-                </label>
-              </div>
-              <button className="primary-button search-button" type="submit">Find trains <span aria-hidden="true">→</span></button>
-              {notice && <p className="form-error" role="alert">{notice}</p>}
-              <p className="demo-note">Demo timetable · Sample prices · No payment or real ticket issued</p>
-            </form>
-            <div className="trust-row">
-              <span><span className="tiny-check">✓</span> Clear journey options</span>
-              <span><span className="tiny-check">✓</span> Tickets saved offline</span>
-              <span><span className="tiny-check">✓</span> Less digital clutter</span>
+          <section className="hero app-home">
+            <div className="home-intro">
+              {/* <div className="eyebrow"><span className="eyebrow-line" /> THE THOUGHTFUL WAY TO GO</div> */}
+              <h1>Where to <em>next?</em></h1>
+              <p className="hero-copy">Across cities, borders and time zones. Find your next train journey, without the noise.</p>
             </div>
+            <div className="search-layout">
+              <form className="search-panel" onSubmit={runSearch}>
+                <div className="panel-heading"><span className="panel-kicker">01 / PLAN YOUR TRIP</span><h2>Find your route</h2></div>
+                <div className="field-grid">
+                  <label className="field location-field"><span>Leaving from</span><select value={from} onChange={(e) => setFrom(e.target.value)}>{stations.map((station) => <option key={station}>{station}</option>)}</select></label>
+                  <button type="button" className="swap-button" aria-label="Swap departure and arrival" onClick={() => { setFrom(to); setTo(from); }}>⇅</button>
+                  <label className="field location-field"><span>Going to</span><select value={to} onChange={(e) => setTo(e.target.value)}>{stations.map((station) => <option key={station}>{station}</option>)}</select></label>
+                  <label className="field"><span>Departure date</span><input type="date" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} required /></label>
+                  <label className="field"><span>Travellers</span><select value={passengers} onChange={(e) => setPassengers(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} {n === 1 ? "passenger" : "passengers"}</option>)}</select></label>
+                </div>
+                <button className="primary-button search-button" type="submit">Explore journeys <span aria-hidden="true">↗</span></button>
+                {notice && <p className="form-error" role="alert">{notice}</p>}
+              </form>
+              <aside className="home-feature" aria-label="Routa approach">
+                <span className="feature-index">A BETTER WAY THROUGH EUROPE</span>
+                
+                <h2>More journey.<br/><em>Less noise.</em></h2>
+                <p>Simple choices. Lighter pages. Your route, at your pace.</p>
+                <div className="feature-footer"><span>NO ADS</span><span>OFFLINE ITINERARIES</span><span>MAPS ON REQUEST</span></div>
+              </aside>
+            </div>
+            <div className="trust-row"><span>01 — Compare clearly</span><span>02 — Secure checkout</span><span>03 — Keep your itinerary offline</span></div>
           </section>
         )}
 
         {page === "results" && (
-          <section className="content-section">
-            <button className="back-link" onClick={() => nav("search")}>← Edit search</button>
-            <div className="section-heading">
-              <div>
-                <div className="eyebrow">Your journey</div>
-                <h1 className="page-title">{from} <span className="heading-arrow">→</span> {to}</h1>
-                <p className="muted">{new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {passengers} {Number(passengers) === 1 ? "passenger" : "passengers"}</p>
-              </div>
-              <div className="result-count">{results.length} options</div>
-            </div>
-            <div className="results-toolbar">
-              <span className="muted small">Sort by</span>
-              <div className="sort-control">
-                {[["recommended","Recommended"],["cheapest","Cheapest"],["fastest","Fastest"]].map(([value,label]) => <button key={value} className={sort === value ? "sort-option selected" : "sort-option"} onClick={() => { setSort(value); setVisibleCount(5); }}>{label}</button>)}
-              </div>
-            </div>
-            {results.length === 0 ? (
-              <div className="empty-state"><h2>No demo journeys found</h2><p>Try Brussels–Amsterdam, Brussels–Paris, Brussels–Antwerp or the reverse routes.</p><button className="secondary-button" onClick={() => nav("search")}>Change search</button></div>
-            ) : (
-              <div className="journey-list">
-                {results.slice(0, visibleCount).map((journey) => (
-                  <article className="journey-card" key={journey.id}>
-                    <div className="journey-main">
-                      <div className="journey-times">
-                        <div><strong>{journey.depart}</strong><span>{journey.from}</span></div>
-                        <div className="journey-duration"><span>{durationLabel(journey.duration)}</span><div className="duration-line"><i /></div><span>{journey.changes === 0 ? "Direct" : `${journey.changes} change`}</span></div>
-                        <div className="arrival"><strong>{journey.arrive}</strong><span>{journey.to}</span></div>
-                      </div>
-                      <div className="journey-meta"><span>{journey.operator} · {journey.code}</span><span>{journey.stops.length} stops / stations</span></div>
-                      <RouteLine stops={journey.stops} />
-                    </div>
-                    <div className="journey-action">
-                      <div className="price">{money(journey.price)}<small> / person</small></div>
-                      {journey.id === recommendedId && <span className="recommendation">Best balance of price & time</span>}
-                      <button className="primary-button choose-button" onClick={() => startBooking(journey)} disabled={!online}>Select journey</button>
-                    </div>
-                  </article>
-                ))}
-                {visibleCount < results.length && <button className="load-more" onClick={() => setVisibleCount((n) => n + 5)}>Load more journeys</button>}
-              </div>
-            )}
-            <p className="disclaimer">Illustrative journey data only. Times, operators and fares are not live or bookable.</p>
+          <section className="content-section results-page">
+            <button className="back-link" onClick={() => nav("search")}>← Modify search</button>
+            <div className="section-heading"><div><div className="eyebrow">02 / DISCOVER</div><h1 className="page-title">Your <em>options.</em></h1><p className="route-subtitle">{from} <span>↗</span> {to}</p><p className="muted">{new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {passengers} {Number(passengers) === 1 ? "passenger" : "passengers"}</p></div><span className="result-count">{results.length} JOURNEYS</span></div>
+            <div className="results-toolbar"><span className="toolbar-title">Choose what matters most</span><div className="sort-control">{[["recommended","Balanced"],["cheapest","Lowest price"],["fastest","Shortest time"]].map(([value,label]) => <button key={value} className={sort === value ? "sort-option selected" : "sort-option"} onClick={() => { setSort(value); setVisibleCount(5); }}>{label}</button>)}</div></div>
+            {results.length === 0 ? <div className="empty-state"><h2>No journeys found for this route</h2><p>Try Brussels–Amsterdam, Brussels–Paris, Brussels–Antwerp or the reverse routes. Try another departure or destination.</p><button className="secondary-button" onClick={() => nav("search")}>Change route</button></div> : <div className="journey-list">
+              {results.slice(0,visibleCount).map((journey,index) => <article className="journey-card" key={journey.id}>
+                <div className="journey-main"><div className="journey-card-top"><span className="journey-number">OPTION {String(index+1).padStart(2,"0")}</span><span className="journey-operator">{journey.operator} · {journey.code}</span></div>
+                  <div className="journey-times"><div><strong>{journey.depart}</strong><span>{journey.from}</span></div><div className="journey-duration"><span>{durationLabel(journey.duration)}</span><div className="duration-line"><i/></div><span>{journey.changes === 0 ? "Direct" : `${journey.changes} change${journey.changes > 1 ? "s" : ""}`}</span></div><div className="arrival"><strong>{journey.arrive}</strong><span>{journey.to}</span></div></div>
+                  <RouteLine stops={journey.stops}/>
+                </div>
+                <div className="journey-action">{journey.id === recommendedId && <span className="recommendation">✳ GOOD BALANCE</span>}<span className="price-label">FROM / PERSON</span><div className="price">{money(journey.price)}</div><button className="primary-button choose-button" onClick={() => startBooking(journey)} disabled={!online}>Book journey <span aria-hidden="true">↗</span></button></div>
+              </article>)}
+              {visibleCount < results.length && <button className="load-more" onClick={() => setVisibleCount(n=>n+5)}>Show more journeys ↓</button>}
+            </div>}
           </section>
         )}
 
         {page === "checkout" && selected && (
           <section className="content-section narrow-section">
             <button className="back-link" onClick={() => nav("results")}>← Back to results</button>
-            <div className="eyebrow">Almost there</div>
-            <h1 className="page-title">Passenger details</h1>
-            <p className="muted">Review your selected journey and add a demo passenger name.</p>
+            <div className="eyebrow">03 / CHECKOUT</div>
+            <h1 className="page-title">One last <em>step.</em></h1>
+            <p className="muted">Review your selected journey and add a passenger name.</p>
             <div className="summary-card">
               <div className="summary-route"><strong>{selected.from}</strong><span>→</span><strong>{selected.to}</strong></div>
               <div className="summary-details">{selected.depart} – {selected.arrive} · {durationLabel(selected.duration)} · {new Date(`${date}T12:00:00`).toLocaleDateString("en-GB")}</div>
               <div className="summary-price">{money(selected.price * Number(passengers))}</div>
             </div>
             <form className="checkout-form" onSubmit={confirmBooking}>
-              <label className="field"><span>Passenger name (demo only)</span><input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} maxLength="70" autoComplete="off" placeholder="e.g. Alex Morgan" required /></label>
-              <div className="notice-box"><strong>Demo checkout</strong><p>You can save an itinerary without paying, or open Stripe test checkout. Neither option issues a real railway ticket. Do not enter real personal information.</p></div>
-              <button className="primary-button full-button" type="submit" disabled={!online}>Save demo itinerary without payment <span>→</span></button>
-              <button className="secondary-button full-button" type="button" disabled={!online || stripeLoading} onClick={payWithStripe}>{stripeLoading ? "Opening Stripe…" : "Pay with Stripe (test mode) →"}</button>
+              <label className="field"><span>Passenger name</span><input value={passengerName} onChange={(e) => setPassengerName(e.target.value)} maxLength="70" autoComplete="off" placeholder="e.g. Alex Morgan" required /></label>
+              <div className="notice-box"><strong>Checkout information</strong><p>Save an itinerary locally or use Stripe test checkout. No railway reservation is made. Stripe uses test payments only. Please use a fictional passenger name.</p></div>
+              {/* <button className="primary-button full-button" type="submit" disabled={!online}>Save itinerary without payment <span>→</span></button> */}
+              <button className="secondary-button full-button" type="button" disabled={!online || stripeLoading} onClick={payWithStripe}>{stripeLoading ? "Opening Stripe…" : "Pay with Stripe →"}</button>
               {notice && <p className="form-error" role="alert">{notice}</p>}
-              {notice && <p role="alert" className="form-error">{notice}</p>}
+        
             </form>
           </section>
         )}
@@ -339,10 +310,9 @@ function App() {
             <div className="success-icon">✓</div>
             <div className="eyebrow centered">Booking saved</div>
             <h1 className="page-title centered-title">You're all set.</h1>
-            <p className="muted centered-text">Your demo journey is saved on this device and available offline.</p>
+            <p className="muted centered-text">Your itinerary is saved on this device and available offline.</p>
             <Ticket booking={activeBooking} />
             <BookingQR booking={activeBooking} />
-            <div className="notice-box warning-box"><strong>Not a valid travel ticket</strong><p>This is a hackathon demonstration. No railway reservation has been made. Stripe payments, when used, are in test mode only.</p></div>
             <button className="primary-button full-button" onClick={() => openBooking(activeBooking)}>View my journey</button>
             <button className="text-button full-button" onClick={() => nav("search")}>Search another journey</button>
           </section>
@@ -350,16 +320,16 @@ function App() {
 
         {page === "tickets" && (
           <section className="content-section">
-            <div className="eyebrow">Your travel space</div>
-            <h1 className="page-title">My journeys</h1>
+            {/* <div className="eyebrow">YOUR TRAVEL SPACE</div> */}
+            <h1 className="page-title">My <em>journeys.</em></h1>
             <p className="muted">Your saved bookings, together in one place.</p>
             {bookings.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">▤</div><h2>No journeys yet</h2><p>Your confirmed demo bookings will appear here.</p><button className="primary-button" onClick={() => nav("search")}>Find a train</button></div>
+              <div className="empty-state"><div className="empty-icon">▤</div><h2>No journeys yet</h2><p>Your saved itineraries will appear here.</p><button className="primary-button" onClick={() => nav("search")}>Find a train</button></div>
             ) : (
               <div className="journey-list tickets-list">
                 {bookings.map((booking) => (
-                  <article className={`saved-card ${booking.status === "cancelled" ? "cancelled-card" : ""}`} key={booking.id}>
-                    <div className="saved-card-top"><span className="booking-ref">{booking.id}</span><span className={booking.status === "confirmed" ? "status-pill" : "status-pill cancelled"}>{booking.status === "confirmed" ? "Saved" : "Cancelled"}</span></div>
+                  <article className="saved-card" key={booking.id}>
+                    <div className="saved-card-top"><span className="booking-ref">{booking.id}</span><span className="status-pill">Saved</span></div>
                     <div className="summary-route"><strong>{booking.journey.from}</strong><span>→</span><strong>{booking.journey.to}</strong></div>
                     <div className="summary-details">{booking.journey.depart} – {booking.journey.arrive} · {new Date(`${booking.date}T12:00:00`).toLocaleDateString("en-GB")}</div>
                     <button className="secondary-button" onClick={() => openBooking(booking)}>View journey details →</button>
@@ -373,8 +343,9 @@ function App() {
         {page === "ticket" && activeBooking && (
           <section className="content-section narrow-section">
             <button className="back-link" onClick={() => nav("tickets")}>← My journeys</button>
-            <div className="eyebrow">Journey details</div>
-            <h1 className="page-title">Your itinerary</h1>
+            <div className="eyebrow">03 / YOUR JOURNEY</div>
+            <h1 className="page-title">Journey <em>details.</em></h1>
+            <p className="muted">Everything you need in one place. Your reference is available offline.</p>
             <Ticket booking={activeBooking} />
             <BookingQR booking={activeBooking} />
             <div className="timeline-card">
@@ -384,9 +355,8 @@ function App() {
               </div>
             </div>
             <OnDemandMap key={activeBooking.id} journey={activeBooking.journey} />
-            <div className="notice-box"><strong>Offline access</strong><p>This itinerary is saved on this device. Live disruption information is unavailable in this demo.</p></div>
-            {activeBooking.status === "confirmed" && <button className="danger-button full-button" onClick={() => cancelBooking(activeBooking.id)}>Remove demo booking</button>}
-            <p className="disclaimer">Removing this demo booking does not cancel a real railway ticket.</p>
+            <div className="notice-box"><strong>Offline access</strong><p>This itinerary is saved on this device. Live disruption information is not available.</p></div>
+            <button className="danger-button full-button" onClick={() => cancelBooking(activeBooking.id)}>Cancel booking</button>
           </section>
         )}
       </main>
@@ -394,7 +364,6 @@ function App() {
       <footer className="footer">
         <span>© 2026 Routa</span>
         <span>Designed for lighter digital journeys.</span>
-        <span className="footer-demo">Hackathon prototype · Not for travel</span>
       </footer>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -408,15 +377,15 @@ function BookingQR({ booking }) {
   const [dataUrl, setDataUrl] = useState("");
   useEffect(() => {
     let active = true;
-    // Encode only an opaque demo reference, never passenger details or Stripe identifiers.
-    QRCode.toDataURL(`ROUTA-DEMO:${booking.id}`, { width: 280, margin: 4, errorCorrectionLevel: "H", color: { dark: "#172c26", light: "#ffffff" } })
+    // Encode only an opaque booking reference, never passenger details or Stripe identifiers.
+    QRCode.toDataURL(`ROUTA-REF:${booking.id}`, { width: 280, margin: 4, errorCorrectionLevel: "H", color: { dark: "#172c26", light: "#ffffff" } })
       .then(url => { if (active) setDataUrl(url); })
       .catch(() => { if (active) setDataUrl(""); });
     return () => { active = false; };
   }, [booking.id]);
-  return <section className="qr-panel" aria-label="Demo booking QR code">
-    <div><h2>Booking QR</h2><p>Scannable demo reference · Not a valid railway ticket</p></div>
-    {dataUrl ? <img src={dataUrl} alt={`QR code containing demo booking reference ${booking.id}`} width="200" height="200" /> : <p>Generating QR code…</p>}
+  return <section className="qr-panel" aria-label="Booking reference QR code">
+    <div><h2>Booking QR</h2></div>
+    {dataUrl ? <img src={dataUrl} alt={`QR code containing booking reference ${booking.id}`} width="200" height="200" /> : <p>Generating QR code…</p>}
     <strong>{booking.id}</strong>
   </section>;
 }
@@ -434,23 +403,22 @@ function OnDemandMap({ journey }) {
   const lats = coords.map(p => p[0]); const lons = coords.map(p => p[1]);
   const bbox = coords.length ? [Math.min(...lons)-0.65,Math.min(...lats)-0.4,Math.max(...lons)+0.65,Math.max(...lats)+0.4].join(",") : null;
   return <section className="map-panel">
-    <div className="map-heading"><div><h2>Explore the route</h2><p>Optional map · Loaded only when requested</p></div>
+    <div className="map-heading"><div><h2>Explore the route</h2></div>
       <button className="secondary-button" type="button" aria-expanded={show} onClick={() => setShow(v => !v)}>{show ? "Hide interactive map" : "Show interactive map ↗"}</button>
     </div>
     {show && (bbox ? <><iframe title={`OpenStreetMap overview of ${journey.from} to ${journey.to}`} loading="lazy" referrerPolicy="no-referrer" src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik`} />
-      <p className="map-caption">Geographic overview only, not a verified rail track or live route. Map data © OpenStreetMap contributors. Requires internet access.</p></> : <p className="map-caption">A map preview is not available for this demonstration itinerary.</p>)}
+      <p className="map-caption">Geographic overview only, not a verified rail track or live route. Map data © OpenStreetMap contributors. Requires internet access.</p></> : <p className="map-caption">A map preview is not available for this itinerary.</p>)}
   </section>;
 }
 
 function Ticket({ booking }) {
   return (
     <div className="ticket-card">
-      <div className="ticket-top"><div className="ticket-brand"><img src="/train-mark.svg" alt="" width="26" height="26" /> routa.</div><span className="demo-ticket">DEMO TICKET</span></div>
+      <div className="ticket-top"><div className="ticket-brand"><img src="/train-mark.svg" alt="" width="26" height="26" /> routa.</div></div>
       <div className="ticket-cities"><div><small>FROM</small><strong>{booking.journey.from}</strong><b>{booking.journey.depart}</b></div><div className="ticket-arrow">→</div><div><small>TO</small><strong>{booking.journey.to}</strong><b>{booking.journey.arrive}</b></div></div>
       <div className="ticket-rule"><span /><span /></div>
-      <div className="ticket-info"><div><small>PASSENGER</small><strong>{booking.passengerName}</strong></div><div><small>DATE</small><strong>{new Date(`${booking.date}T12:00:00`).toLocaleDateString("en-GB")}</strong></div><div><small>REFERENCE</small><strong>{booking.id}</strong></div><div><small>STATUS</small><strong>{booking.status === "confirmed" ? "Saved locally" : "Cancelled"}</strong></div></div>
-      <div className="ticket-bottom">Illustrative only · Not valid for travel</div>
-    </div>
+      <div className="ticket-info"><div><small>PASSENGER</small><strong>{booking.passengerName}</strong></div><div><small>DATE</small><strong>{new Date(`${booking.date}T12:00:00`).toLocaleDateString("en-GB")}</strong></div><div><small>REFERENCE</small><strong>{booking.id}</strong></div><div><small>STATUS</small><strong>"Saved locally"</strong></div></div>
+      </div>
   );
 }
 
